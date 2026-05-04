@@ -90,7 +90,7 @@ export default function StepContact() {
 
         <div className="grid grid-cols-2 gap-3 pt-2">
           <Button intent="secondary" fullWidth onClick={() => router.back()}>Back</Button>
-          <Button fullWidth onClick={handleSubmit}>Submit enquiry</Button>
+          <Button fullWidth className="whitespace-nowrap" onClick={handleSubmit}>Submit enquiry</Button>
         </div>
       </div>
     </div>

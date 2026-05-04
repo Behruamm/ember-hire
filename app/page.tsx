@@ -91,11 +91,11 @@ export default function HomePage() {
 
       {/* Hero — negative margin pulls it behind the sticky nav */}
       <section className="hero-section">
-        <div className="relative z-10 w-full max-w-6xl mx-auto px-[--spacing-container-x]">
-          <p className="text-[var(--color-nav-dark-text)] text-[15px] font-medium mb-3">
+        <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-[--spacing-container-x]">
+          <p className="text-[var(--color-nav-dark-text)] text-sm sm:text-[15px] font-medium mb-3">
             Reliable. Clear pricing. 100% electric.
           </p>
-          <h1 className="text-white font-semibold text-5xl sm:text-6xl lg:text-7xl leading-[1.05] mb-6 max-w-3xl">
+          <h1 className="text-white font-semibold text-4xl sm:text-6xl lg:text-7xl leading-[1.05] mb-6 max-w-3xl">
             Coach hire. But better.
           </h1>
           <Link href="/book">
@@ -105,9 +105,9 @@ export default function HomePage() {
       </section>
 
       {/* Simple */}
-      <section className="py-20 lg:py-28 border-b border-border-subtle">
-        <div className="max-w-6xl mx-auto px-[--spacing-container-x]">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+      <section className="py-14 lg:py-28 border-b border-border-subtle">
+        <div className="max-w-6xl mx-auto px-4 sm:px-[--spacing-container-x]">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-20 items-center">
             <div>
               <h2 className="text-2xl sm:text-3xl font-semibold text-ink mb-5">
                 We&apos;ve made it simple
@@ -152,8 +152,8 @@ export default function HomePage() {
       </section>
 
       {/* Affordable */}
-      <section className="py-20 lg:py-28 border-b border-border-subtle">
-        <div className="max-w-6xl mx-auto px-[--spacing-container-x]">
+      <section className="py-14 lg:py-28 border-b border-border-subtle">
+        <div className="max-w-6xl mx-auto px-4 sm:px-[--spacing-container-x]">
           <div className="text-center mb-12">
             <h2 className="text-2xl sm:text-3xl font-semibold text-ink mb-4">
               We&apos;ve made it affordable
@@ -168,7 +168,7 @@ export default function HomePage() {
             {PRICING_CARDS.map((card) => (
               <div
                 key={card.title}
-                className="relative rounded-md overflow-hidden h-72 sm:h-80 group cursor-pointer"
+                className="relative rounded-md overflow-hidden h-56 sm:h-80 group cursor-pointer"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -198,8 +198,8 @@ export default function HomePage() {
       </section>
 
       {/* Enjoyable */}
-      <section className="py-20 lg:py-28 border-b border-border-subtle">
-        <div className="max-w-6xl mx-auto px-[--spacing-container-x]">
+      <section className="py-14 lg:py-28 border-b border-border-subtle">
+        <div className="max-w-6xl mx-auto px-4 sm:px-[--spacing-container-x]">
           <h2 className="text-2xl sm:text-3xl font-semibold text-ink mb-12 text-center">
             We&apos;ve made it enjoyable
           </h2>
@@ -218,8 +218,8 @@ export default function HomePage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20 lg:py-28 border-b border-border-subtle">
-        <div className="max-w-3xl mx-auto px-[--spacing-container-x]">
+      <section className="py-14 lg:py-28 border-b border-border-subtle">
+        <div className="max-w-3xl mx-auto px-4 sm:px-[--spacing-container-x]">
           <h2 className="text-2xl sm:text-3xl font-semibold text-ink mb-10 text-center">
             Frequently Asked Questions
           </h2>
@@ -229,7 +229,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="py-10 bg-white border-t border-border-subtle">
-        <div className="max-w-6xl mx-auto px-[--spacing-container-x]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-[--spacing-container-x]">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <EmberLogo width={72} />
             <p className="text-xs text-slate-11">
