@@ -39,3 +39,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# tooling / local dev
+.claude/
+.omc/
+.hintrc
+tasks/
+dev-plan/
+test-results/
+playwright-report/
+vendor/
+
+# project docs not for repo
+CLAUDE.md.bak
+DEPLOY.md
+Project.md
+skills.md
+me.md
+HANDOFF.md
+public/logo.html

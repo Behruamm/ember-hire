@@ -1,0 +1,15 @@
+export const BUSINESS_RULES = {
+  emberPhone: '0131 510 4007',
+  coachCapacity: 53,
+  baseRateGbp: 300,
+  driveRatePerHourGbp: 60,
+  waitRatePerHourGbp: 20,
+  passengerStopMinutes: 15,
+  depositRate: 0.25,
+  minBookingNoticeDays: 2,
+  maxBookingWindowDays: 365,
+  largeGroupLimit: 500,
+  maxLocationLength: 100,
+  maxNotesLength: 500,
+  maxGroupSizeInputChars: 4,
+} as const

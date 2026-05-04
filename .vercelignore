@@ -1,0 +1,13 @@
+vendor/
+dev-plan/
+tasks/
+__tests__/
+playwright-report/
+test-results/
+.omc/
+.claude/
+me.md
+Project.md
+HANDOFF.md
+DEPLOY.md
+synchro.com-150x150.png
