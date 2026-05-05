@@ -22,8 +22,9 @@ function timeSchema(requiredMessage: string) {
 
 function toPassengerCount(value: unknown): unknown {
   if (typeof value !== 'string') return value
-  if (!value.trim()) return Number.NaN
-  return Number(value)
+  const trimmed = value.trim()
+  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return Number.NaN
+  return Number(trimmed)
 }
 
 function requiredLocation(message: string) {
@@ -98,7 +99,7 @@ export function createPickupsSchema(groupSize: number | null) {
     if (!needsPassengerCounts) return
 
     const counts = value.rows.map((row, index) => {
-      const parsed = Number.parseInt(row.count, 10)
+      const parsed = /^\d+$/.test(row.count) ? Number(row.count) : Number.NaN
       if (!Number.isInteger(parsed) || parsed < 0) {
         ctx.addIssue({
           code: 'custom',

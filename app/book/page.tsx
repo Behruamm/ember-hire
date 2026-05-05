@@ -1,17 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBooking } from '@/context/BookingContext'
 import DatePicker from '@/components/booking/DatePicker'
-import { Button, Input } from '@/components/ui'
+import { Button, Input, PickerSheet } from '@/components/ui'
 import { coachCount, capacityWarning } from '@/lib/coaches'
 import { createJourneySetupSchema, firstErrorByField, parseJourneyType, VALIDATION_RULES } from '@/lib/schemas'
 import { formatDisplay, addDays, toISO } from '@/lib/format'
 import { BUSINESS_RULES } from '@/lib/business-rules'
+import { digitsOnly } from '@/lib/input-format'
 import type { JourneyType } from '@/types/booking'
 import type { ReactNode } from 'react'
-
 
 function CalendarIcon() {
   return (
@@ -31,38 +31,53 @@ function ArrowIcon({ className = 'h-6 w-6' }: { className?: string }) {
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="mb-1.5 text-xs font-medium text-ink">
+    <legend className="mb-1.5 text-xs font-medium text-ink">
       {children}
       <span aria-hidden="true" className="ml-1 text-red-600">*</span>
-    </p>
+    </legend>
   )
 }
 
-function JourneyTypeToggle({ value, onChange }: { value: JourneyType | ''; onChange: (v: JourneyType) => void }) {
+function JourneyTypeToggle({
+  value,
+  onChange,
+  error,
+}: {
+  value: JourneyType | ''
+  onChange: (v: JourneyType) => void
+  error?: string
+}) {
   const options: { value: JourneyType; label: string }[] = [
     { value: 'oneway', label: 'One way' },
     { value: 'return', label: 'Return' },
   ]
   return (
-    <div className="inline-flex rounded-sm border border-border bg-surface-light p-0.5 gap-0.5">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          aria-pressed={value === opt.value ? true : false}
-          onClick={() => onChange(opt.value)}
-          className={[
-            'px-5 py-2 text-sm font-medium rounded-[2px] transition-colors duration-150',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/40',
-            value === opt.value
-              ? 'bg-brand-green text-white shadow-sm'
-              : 'text-slate-11 hover:text-ink',
-          ].join(' ')}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
+    <fieldset aria-describedby={error ? 'journey-type-error' : undefined}>
+      <legend className="text-xs font-medium text-ink">
+        Journey type <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>
+      </legend>
+      <div className="mt-1.5 inline-flex rounded-sm border border-border bg-surface-light p-0.5 gap-0.5" role="radiogroup" aria-label="Journey type">
+        {options.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={value === opt.value ? true : false}
+            onClick={() => onChange(opt.value)}
+            className={[
+              'min-h-11 px-5 py-2 text-sm font-medium rounded-[2px] transition-colors duration-150',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green/40',
+              value === opt.value
+                ? 'bg-brand-green text-white shadow-sm'
+                : 'text-slate-11 hover:text-ink',
+            ].join(' ')}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      {error && <p id="journey-type-error" role="alert" className="mt-1 text-xs font-medium text-red-600">{error}</p>}
+    </fieldset>
   )
 }
 
@@ -74,6 +89,8 @@ export default function StepJourneySetup() {
   const [date, setDateLocal] = useState(state.date)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [errors, setErrors] = useState<{ journey?: string; group?: string; date?: string }>({})
+  const dateButtonRef = useRef<HTMLButtonElement>(null)
+  const calendarPanelId = 'travel-date-picker'
 
   const minDate = toISO(addDays(new Date(), VALIDATION_RULES.minBookingDays))
   const maxDate = toISO(addDays(new Date(), VALIDATION_RULES.maxBookingDays))
@@ -122,11 +139,14 @@ export default function StepJourneySetup() {
 
       <div className="space-y-6">
         <section className="relative z-20">
-          <FieldLabel>Travel date</FieldLabel>
+          <fieldset>
+            <FieldLabel>Travel date</FieldLabel>
           <button
+            ref={dateButtonRef}
             type="button"
             aria-haspopup="dialog"
             aria-expanded={calendarOpen ? true : false}
+            aria-controls={calendarPanelId}
             onClick={() => { setCalendarOpen((o) => !o); setErrors((p) => ({ ...p, date: undefined })) }}
             className={dateBtnCls(!!errors.date)}
           >
@@ -139,37 +159,26 @@ export default function StepJourneySetup() {
           {errors.date && <p role="alert" className="mt-2 text-sm font-medium text-red-600">{errors.date}</p>}
 
           {calendarOpen && (
-            <div
-              className="fixed inset-0 z-50 flex items-end bg-ink/55 px-4 sm:absolute sm:inset-auto sm:left-0 sm:top-full sm:mt-4 sm:block sm:w-80 sm:bg-transparent sm:px-0"
-              onClick={() => setCalendarOpen(false)}
+            <PickerSheet
+              id={calendarPanelId}
+              ariaLabel="Travel date picker"
+              onClose={() => setCalendarOpen(false)}
+              returnFocusRef={dateButtonRef}
             >
-              <div
-                className="w-full rounded-t-md bg-white shadow-card sm:rounded-none sm:bg-transparent sm:shadow-none"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <DatePicker
-                  value={date}
-                  onChange={handleDate}
-                  minDate={minDate}
-                  maxDate={maxDate}
-                  className="max-w-none rounded-t-md border-0 p-5 shadow-none sm:max-w-xs sm:rounded-md sm:border sm:border-border sm:p-4 sm:shadow-card"
-                />
-                <div className="px-5 pb-5 sm:hidden">
-                  <button
-                    type="button"
-                    onClick={() => setCalendarOpen(false)}
-                    className="h-12 w-full rounded-sm bg-surface-mid text-sm font-semibold text-ink transition-colors hover:bg-slate-7 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
+              <DatePicker
+                value={date}
+                onChange={handleDate}
+                minDate={minDate}
+                maxDate={maxDate}
+                className="max-w-none border-0 p-0 shadow-none"
+              />
+            </PickerSheet>
           )}
+          </fieldset>
         </section>
 
         <section>
-          <div className="flex gap-3 items-start">
+          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
             <div className="flex-1">
               <Input
                 type="text"
@@ -178,7 +187,7 @@ export default function StepJourneySetup() {
                 label="Passengers"
                 required
                 value={groupInput}
-                onChange={(e) => { setGroupInput(e.target.value.slice(0, BUSINESS_RULES.maxGroupSizeInputChars)); setErrors((p) => ({ ...p, group: undefined })) }}
+                onChange={(e) => { setGroupInput(digitsOnly(e.target.value, BUSINESS_RULES.maxGroupSizeInputChars)); setErrors((p) => ({ ...p, group: undefined })) }}
                 placeholder="e.g. 45"
                 aria-label="Number of passengers"
                 error={errors.group}
@@ -186,12 +195,11 @@ export default function StepJourneySetup() {
               />
             </div>
             <div className="shrink-0 flex flex-col gap-1.5">
-              <p className="text-xs font-medium text-ink">Journey type <span aria-hidden="true" className="ml-0.5 text-red-500">*</span></p>
               <JourneyTypeToggle
                 value={journey}
                 onChange={(value) => { setJourney(value); setErrors((p) => ({ ...p, journey: undefined })) }}
+                error={errors.journey}
               />
-              {errors.journey && <p role="alert" className="mt-1 text-xs font-medium text-red-600">{errors.journey}</p>}
             </div>
           </div>
         </section>
@@ -203,7 +211,7 @@ export default function StepJourneySetup() {
               <svg className="mt-0.5 h-4 w-4 shrink-0 text-brand-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-sm font-medium text-brand-green">{warning}</p>
+              <p className="text-sm font-medium text-brand-green-dark">{warning}</p>
             </div>
           )
         )}

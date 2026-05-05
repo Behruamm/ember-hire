@@ -6,7 +6,7 @@ import { useBooking } from '@/context/BookingContext'
 import TimePicker from '@/components/booking/TimePicker'
 import { Button, Badge } from '@/components/ui'
 import { firstErrorByField, returnDetailsSchema } from '@/lib/schemas'
-import { calculateReturnWindow } from '@/lib/return-window'
+import { calculateReturnWindow, isReturnDepartTimeWithinWindow } from '@/lib/return-window'
 import { allocateCoaches, buildSingleCoachPlans, returnRouteForCoach, COACH_CAPACITY } from '@/lib/coach-allocation'
 
 interface RouteSegment {
@@ -92,11 +92,7 @@ export default function StepReturn() {
           const min = state.arrivalTime ?? undefined
           const max = latestDepartTime ?? undefined
           if (!prev) return prev
-          const prevMins = prev ? (Number(prev.slice(0, 2)) * 60 + Number(prev.slice(3))) : -1
-          const minMins = min ? (Number(min.slice(0, 2)) * 60 + Number(min.slice(3))) : -Infinity
-          const maxMins = max ? (Number(max.slice(0, 2)) * 60 + Number(max.slice(3))) : Infinity
-          if (prevMins < minMins || prevMins > maxMins) return ''
-          return prev
+          return isReturnDepartTimeWithinWindow(prev, min, max) ? prev : ''
         })
       })
       .catch((err) => {
@@ -122,6 +118,10 @@ export default function StepReturn() {
       setErrors({ time: 'Wait for the return route check before continuing' })
       return
     }
+    if (!isReturnDepartTimeWithinWindow(result.data.returnDepartTime, state.arrivalTime, routeCheck.latestDepartTime)) {
+      setErrors({ time: 'Choose a return departure time within the available same-day window' })
+      return
+    }
     setReturnPickups(result.data.returnPickups)
     setReturnDepartTime(result.data.returnDepartTime)
     router.push('/book/quote')
@@ -135,18 +135,18 @@ export default function StepReturn() {
         {/* Route summary: pickup point → drop-off stops */}
         <div className="rounded-sm border border-border overflow-hidden">
           {/* Pickup row */}
-          <div className="flex items-center justify-between gap-3 bg-brand-green/5 px-4 py-2.5">
-            <p className="text-sm font-semibold text-ink truncate min-w-0">{state.dropoff}</p>
+          <div className="flex items-start justify-between gap-3 bg-brand-green/5 px-4 py-2.5">
+            <p className="min-w-0 break-words text-sm font-semibold text-ink">{state.dropoff}</p>
             <Badge intent="primary">{state.groupSize ?? 0} people</Badge>
           </div>
 
           {/* Drop-off stops */}
           {stops.map((stop, i) => (
             <div key={i} className="flex items-center gap-2.5 border-t border-border px-3 py-2">
-              <span className="text-xs font-bold text-slate-9 w-4 text-center shrink-0">{i + 1}</span>
-              <span className="flex-1 text-sm text-ink truncate">{stop}</span>
+              <span className="w-4 shrink-0 text-center text-xs font-bold text-slate-11">{i + 1}</span>
+              <span className="min-w-0 flex-1 break-words text-sm text-ink">{stop}</span>
               {returnPassengerCounts[i] !== undefined && (
-                <span className="text-xs text-slate-9 shrink-0">{returnPassengerCounts[i]} pax</span>
+                <span className="shrink-0 text-xs text-slate-11">{returnPassengerCounts[i]} pax</span>
               )}
             </div>
           ))}

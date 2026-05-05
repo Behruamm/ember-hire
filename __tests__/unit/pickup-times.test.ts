@@ -32,8 +32,8 @@ describe('formatTime', () => {
 //
 // 1 pickup → dropoff
 // Segment: EH1→Murrayfield = 30 min
-// Arrive: 14:00 (840)
-// EH1 departs: 840 - 30 (drive) - 15 (boarding) = 795 = 13:15
+// Drop-off complete: 14:00 (840)
+// EH1 departs: 840 - BOARDING_MINUTES (drop-off) - 30 (drive) - BOARDING_MINUTES (boarding) = 780 = 13:00
 
 describe('calcPickupTimeline — single pickup, one way', () => {
   const segments = [{ from: 'EH1 1YZ', to: 'Murrayfield', driveMinutes: 30 }]
@@ -44,10 +44,10 @@ describe('calcPickupTimeline — single pickup, one way', () => {
     expect(result).toHaveLength(1)
   })
 
-  it('departure = arrival - drive - boarding (13:15)', () => {
+  it('departure = complete time - drop-off - drive - boarding (13:00)', () => {
     const result = calcPickupTimeline(segments, pickups, '14:00')
     expect(result[0].stop).toBe('EH1 1YZ')
-    expect(result[0].departTime).toBe('13:15')
+    expect(result[0].departTime).toBe('13:00')
   })
 
   it('returns empty array for no pickups', () => {
@@ -57,16 +57,17 @@ describe('calcPickupTimeline — single pickup, one way', () => {
 
 // ── calcPickupTimeline — multi pickup, one way ────────────────────────────
 //
-// 3 pickups: EH1 → EH10 → EH9 → Murrayfield (arrive 14:00)
+// 3 pickups: EH1 → EH10 → EH9 → Murrayfield (drop-off complete 14:00)
 // Segments:
 //   [0] EH1→EH10:        9 min
 //   [1] EH10→EH9:        4 min
 //   [2] EH9→Murrayfield: 18 min
 //
 // Walk backwards:
-//   EH9:  840 - 18 - 15 = 807 = 13:27
-//   EH10: 807 - 4  - 15 = 788 = 13:08
-//   EH1:  788 - 9  - 15 = 764 = 12:44
+//   Destination arrival: 840 - BOARDING_MINUTES = 825 = 13:45
+//   EH9:  825 - 18 - BOARDING_MINUTES = 792 = 13:12
+//   EH10: 792 - 4  - BOARDING_MINUTES = 773 = 12:53
+//   EH1:  773 - 9  - BOARDING_MINUTES = 749 = 12:29
 
 describe('calcPickupTimeline — multi pickup, one way', () => {
   const segments = [
@@ -86,19 +87,19 @@ describe('calcPickupTimeline — multi pickup, one way', () => {
     expect(result.map(r => r.stop)).toEqual(['EH1 1YZ', 'EH10 4BF', 'EH9 1SH'])
   })
 
-  it('EH9 (last pickup) departs 13:27', () => {
+  it('EH9 (last pickup) departs 13:12', () => {
     const result = calcPickupTimeline(segments, pickups, '14:00')
-    expect(result[2].departTime).toBe('13:27')
+    expect(result[2].departTime).toBe('13:12')
   })
 
-  it('EH10 (middle pickup) departs 13:08', () => {
+  it('EH10 (middle pickup) departs 12:53', () => {
     const result = calcPickupTimeline(segments, pickups, '14:00')
-    expect(result[1].departTime).toBe('13:08')
+    expect(result[1].departTime).toBe('12:53')
   })
 
-  it('EH1 (first pickup) departs 12:44', () => {
+  it('EH1 (first pickup) departs 12:29', () => {
     const result = calcPickupTimeline(segments, pickups, '14:00')
-    expect(result[0].departTime).toBe('12:44')
+    expect(result[0].departTime).toBe('12:29')
   })
 })
 
@@ -107,10 +108,11 @@ describe('calcPickupTimeline — multi pickup, one way', () => {
 // Return pickup stops (derived from the outbound journey)
 // Example: Murrayfield → EH9 → EH1 (back home)
 // Segments: MF→EH9 = 18min, EH9→EH1 = 13min
-// "Arrive" back at EH1 by 17:45
+// Return complete back at EH1 by 17:45
 //
-// EH9:         17:45 - 13 - 15 = 17:17
-// Murrayfield: 17:17 - 18 - 15 = 16:44
+// Final drop-off starts: 17:45 - BOARDING_MINUTES = 17:30
+// EH9:         17:30 - 13 - BOARDING_MINUTES = 17:02
+// Murrayfield: 17:02 - 18 - BOARDING_MINUTES = 16:29
 
 describe('calcPickupTimeline — return journey', () => {
   const returnSegments = [
@@ -119,16 +121,16 @@ describe('calcPickupTimeline — return journey', () => {
   ]
   const returnPickups = ['Murrayfield', 'EH9 1SH']
 
-  it('Murrayfield departs 16:44', () => {
+  it('Murrayfield departs 16:29', () => {
     const result = calcPickupTimeline(returnSegments, returnPickups, '17:45')
     expect(result[0].stop).toBe('Murrayfield')
-    expect(result[0].departTime).toBe('16:44')
+    expect(result[0].departTime).toBe('16:29')
   })
 
-  it('EH9 departs 17:17', () => {
+  it('EH9 departs 17:02', () => {
     const result = calcPickupTimeline(returnSegments, returnPickups, '17:45')
     expect(result[1].stop).toBe('EH9 1SH')
-    expect(result[1].departTime).toBe('17:17')
+    expect(result[1].departTime).toBe('17:02')
   })
 })
 
@@ -136,16 +138,16 @@ describe('calcPickupTimeline — return journey', () => {
 
 describe('calcPickupTimeline — edge cases', () => {
   it('early morning: departure stays before arrival', () => {
-    // Arrive 01:00, 30min drive → departs 01:00 - 30 - 15 = 00:15
+    // Complete 01:00, 30min drive → departs 01:00 - BOARDING_MINUTES - 30 - BOARDING_MINUTES = 00:00
     const segments = [{ from: 'Stop A', to: 'Dest', driveMinutes: 30 }]
     const result = calcPickupTimeline(segments, ['Stop A'], '01:00')
-    expect(result[0].departTime).toBe('00:15')
+    expect(result[0].departTime).toBe('00:00')
   })
 
   it('wraps past midnight when departure would be before 00:00', () => {
-    // Arrive 00:10, 30min drive → departs 10 - 30 - 15 = -35 → 23:25
+    // Complete 00:10, 30min drive → departs 10 - BOARDING_MINUTES - 30 - BOARDING_MINUTES = -50 → 23:10
     const segments = [{ from: 'Stop A', to: 'Dest', driveMinutes: 30 }]
     const result = calcPickupTimeline(segments, ['Stop A'], '00:10')
-    expect(result[0].departTime).toBe('23:25')
+    expect(result[0].departTime).toBe('23:10')
   })
 })

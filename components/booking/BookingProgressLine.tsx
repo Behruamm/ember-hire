@@ -33,7 +33,7 @@ export default function BookingProgressLine() {
     <div
       role="progressbar"
       aria-label={`Booking progress: Step ${current} of ${total}, ${label}`}
-      className="absolute bottom-0 left-0 right-0 h-[3px] bg-surface-mid overflow-hidden"
+      className="h-[3px] bg-surface-mid overflow-hidden"
     >
       <div
         className="progress-fill"

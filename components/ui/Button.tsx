@@ -20,8 +20,8 @@ const intentClasses: Record<Exclude<Intent, 'danger'>, string> = {
 }
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'h-8 px-3 text-xs gap-1.5',
-  md: 'h-10 px-7 text-sm gap-2',
+  sm: 'min-h-11 px-3 text-xs gap-1.5',
+  md: 'min-h-11 px-7 text-sm gap-2',
   lg: 'h-12 px-7 text-lg gap-2',
 }
 

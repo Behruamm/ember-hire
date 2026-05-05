@@ -11,9 +11,7 @@ Guidance for Codex agents working in this repository.
 No online checkout, no real auth, no database. Booking state lives client-side and Google Maps calls run through a server-side API route so the key never reaches the browser.
 
 Read these first:
-- [Project.md](Project.md)
-- [HANDOFF.md](HANDOFF.md)
-- [dev-plan/README.md](dev-plan/README.md)
+- [BUILDING_APPROACH.md](BUILDING_APPROACH.md)
 
 ---
 
@@ -56,7 +54,8 @@ npx tsc --noEmit
 ### Core Logic
 
 ```text
-lib/pickup-times.ts      Back-calculates pickup timelines from arrival time
+lib/pickup-times.ts      Back-calculates pickup timelines from drop-off-complete arrival time
+lib/outbound-window.ts   Calculates earliest feasible same-day arrival time
 lib/business-rules.ts    Central rates, capacity, deposit, booking window
 lib/coach-allocation.ts  Splits passenger groups into coach plans
 lib/quote-engine.ts      Calculates quote totals from booking state and route segments
@@ -78,7 +77,9 @@ Passenger stop time is 15 minutes for every pickup and every drop-off:
 - Outbound: each pickup plus final destination drop-off.
 - Return: destination pickup plus each return drop-off.
 
-Waiting time is used only for same-day return journeys and is the gap between destination arrival and return departure, charged per coach.
+Arrival time must be feasible from a 00:00 same-day start using the longest outbound coach plan, including pickup boarding, real drive time, and final destination drop-off; keep that rule in shared business logic, not only in UI controls.
+
+Waiting time is used only for same-day return journeys and is the gap between outbound drop-off complete and return departure, charged per coach. Return departure must be at or after outbound completion and each return route must finish before midnight; keep that rule in shared business logic, not only in UI controls.
 
 The public form requires at least 48 hours' notice. Quotes may show an estimated 25% deposit, but payment is arranged only after Ember confirms the details by phone.
 

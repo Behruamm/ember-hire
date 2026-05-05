@@ -42,7 +42,7 @@ export default function StepConfirmation() {
           <button
             type="button"
             onClick={handleCopy}
-            className="text-xs text-brand-green underline underline-offset-2 hover:text-brand-green-dark transition-colors"
+            className="min-h-11 rounded-sm px-2 text-sm font-medium text-brand-green underline underline-offset-2 hover:text-brand-green-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
           >
             {copied ? 'Copied!' : 'Copy reference'}
           </button>
@@ -50,7 +50,7 @@ export default function StepConfirmation() {
       </div>
 
       <p className="text-center text-sm text-slate-11 mb-8">
-        We&apos;ll call within 24 hours to confirm. Full details sent to your email.
+        We&apos;ll call within 24 hours to confirm the journey and arrange payment.
       </p>
 
       <Button fullWidth onClick={() => { clearBooking(); router.push('/') }}>
@@ -59,4 +59,3 @@ export default function StepConfirmation() {
     </div>
   )
 }
-

@@ -14,11 +14,12 @@ export interface PickupTime {
 }
 
 /**
- * Given route segments (pickup[0]→pickup[1]→...→dropoff) and the arrival time,
- * back-calculates the departure time for each pickup stop.
+ * Given route segments (pickup[0]→pickup[1]→...→dropoff) and the target
+ * drop-off-complete time, back-calculates the departure time for each pickup stop.
  *
- * For each stop: subtract 15min boarding, then subtract drive time from
- * that stop to the next, walking backwards from arrival.
+ * The coach arrives at the destination one passenger stop before the target time.
+ * For each pickup stop: subtract boarding, then subtract drive time from
+ * that stop to the next, walking backwards from destination arrival.
  */
 export function calcPickupTimeline(
   segments: Segment[],   // consecutive pairs: [p0→p1, p1→p2, ..., lastPickup→dropoff]
@@ -27,7 +28,7 @@ export function calcPickupTimeline(
 ): PickupTime[] {
   if (pickups.length === 0) return []
 
-  let cursor = parseTime(arrivalTime)
+  let cursor = parseTime(arrivalTime) - BOARDING_MINUTES
   const times: PickupTime[] = []
 
   // Walk backwards: last pickup → first pickup

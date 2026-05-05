@@ -7,6 +7,7 @@ import { Button, Input } from '@/components/ui'
 import { createPickupsSchema } from '@/lib/schemas'
 import { COACH_CAPACITY } from '@/lib/coach-allocation'
 import { BUSINESS_RULES } from '@/lib/business-rules'
+import { digitsOnly } from '@/lib/input-format'
 
 type FieldErrors = Record<number, string>
 
@@ -66,7 +67,7 @@ export default function StepPickups() {
   }
 
   const updateCount = (i: number, val: string) => {
-    setCounts((prev) => prev.map((s, idx) => (idx === i ? val.slice(0, BUSINESS_RULES.maxGroupSizeInputChars) : s)))
+    setCounts((prev) => prev.map((s, idx) => (idx === i ? digitsOnly(val, BUSINESS_RULES.maxGroupSizeInputChars) : s)))
     setCountErrors((prev) => {
       const next = { ...prev }
       delete next[i]
@@ -119,14 +120,14 @@ export default function StepPickups() {
     const needsPassengerCountsForRows = (state.groupSize ?? 0) > COACH_CAPACITY && rows.length > 1
     if (needsPassengerCountsForRows) {
       for (const row of validRows) {
-        const parsed = Number.parseInt(row.count, 10)
+        const parsed = /^\d+$/.test(row.count) ? Number(row.count) : Number.NaN
         if (!Number.isInteger(parsed) || parsed < 0) {
           nextCountErrors[row.originalIndex] = 'Enter passenger numbers for this pickup'
         }
       }
 
       const assignedPassengers = validRows.reduce((sum, row) => {
-        const parsed = Number.parseInt(row.count, 10)
+        const parsed = /^\d+$/.test(row.count) ? Number(row.count) : Number.NaN
         return sum + (Number.isInteger(parsed) && parsed >= 0 ? parsed : 0)
       }, 0)
       if (assignedPassengers !== state.groupSize) {
@@ -156,7 +157,7 @@ export default function StepPickups() {
 
     const valid = result.data.rows.map((row) => row.stop)
     if (needsPassengerCountsForRows) {
-      setPickupPassengerCounts(result.data.rows.map((row) => Number.parseInt(row.count, 10)))
+      setPickupPassengerCounts(result.data.rows.map((row) => Number(row.count)))
     } else {
       setPickupPassengerCounts([])
     }
@@ -173,7 +174,7 @@ export default function StepPickups() {
   const hasCountErrors = Object.keys(countErrors).length > 0
   const assigned = counts.reduce((sum, raw, i) => {
     if (!stops[i]?.trim()) return sum
-    const v = Number.parseInt(raw, 10)
+    const v = /^\d+$/.test(raw) ? Number(raw) : Number.NaN
     return sum + (Number.isInteger(v) ? v : 0)
   }, 0)
   const passengerStatusTone = assignmentError || hasCountErrors
@@ -201,12 +202,29 @@ export default function StepPickups() {
             <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>
           </p>
           {stops.map((stop, i) => (
-            <div key={i} className="flex gap-2 items-center">
-              <div className="w-6 h-6 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-brand-green">{i + 1}</span>
+            <div
+              key={i}
+              className={[
+                'grid items-start gap-x-2 gap-y-2',
+                stops.length > 1 && needsPassengerCounts
+                  ? 'grid-cols-[1.5rem_minmax(0,1fr)_2.75rem] sm:grid-cols-[1.5rem_minmax(0,1fr)_9rem_2.75rem]'
+                  : stops.length > 1
+                    ? 'grid-cols-[1.5rem_minmax(0,1fr)_2.75rem] sm:grid-cols-[1.5rem_minmax(0,1fr)_2.75rem]'
+                    : 'grid-cols-[1.5rem_minmax(0,1fr)]',
+              ].join(' ')}
+            >
+              <div className={[
+                'relative flex min-h-12 w-6 shrink-0 justify-center self-stretch',
+                needsPassengerCounts ? 'row-span-2' : '',
+              ].join(' ')}>
+                {i > 0 && <span aria-hidden="true" className="absolute left-1/2 top-[-0.75rem] h-6 w-px -translate-x-1/2 bg-border" />}
+                {i < stops.length - 1 && <span aria-hidden="true" className="absolute bottom-[-0.75rem] left-1/2 top-9 w-px -translate-x-1/2 bg-border" />}
+                <div className="relative z-10 mt-3 flex h-6 w-6 items-center justify-center rounded-full bg-brand-green/10">
+                  <span className="text-xs font-bold text-brand-green">{i + 1}</span>
+                </div>
               </div>
 
-              <div className="flex-1 min-w-0 flex gap-2 items-center">
+              <div className="min-w-0">
                 <Input
                   value={stop}
                   onChange={(e) => update(i, e.target.value)}
@@ -214,10 +232,11 @@ export default function StepPickups() {
                   maxLength={BUSINESS_RULES.maxLocationLength}
                   aria-label={`Pickup stop ${i + 1}`}
                   error={stopErrors[i]}
-                  className="flex-1 min-w-0"
                 />
+              </div>
 
-                {needsPassengerCounts && (
+              {needsPassengerCounts && (
+                <div className="col-start-2 min-w-0 sm:col-start-3">
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -227,17 +246,19 @@ export default function StepPickups() {
                     placeholder="People"
                     aria-label={`Passengers at pickup ${i + 1}`}
                     error={countErrors[i]}
-                    className="w-20 shrink-0"
                   />
-                )}
-              </div>
+                </div>
+              )}
 
               {stops.length > 1 && (
                 <button
                   type="button"
                   onClick={() => remove(i)}
                   aria-label={`Remove stop ${i + 1}`}
-                  className="p-2 -m-2 text-slate-8 hover:text-ink transition-colors shrink-0"
+                  className={[
+                    'row-start-1 flex min-h-12 min-w-11 items-center justify-center rounded-sm text-slate-11 transition-colors hover:bg-surface-light hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
+                    needsPassengerCounts ? 'col-start-3 sm:col-start-4' : 'col-start-3',
+                  ].join(' ')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -250,7 +271,7 @@ export default function StepPickups() {
           <button
             type="button"
             onClick={add}
-            className="flex items-center gap-2 text-sm font-medium text-brand-green hover:text-brand-green-dark transition-colors"
+            className="flex min-h-11 items-center gap-2 rounded-sm text-sm font-medium text-brand-green hover:text-brand-green-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -265,7 +286,7 @@ export default function StepPickups() {
             passengerStatusTone === 'error'
               ? 'border-red-100 bg-red-50 text-red-700'
               : passengerStatusTone === 'ready'
-              ? 'border-brand-green/20 bg-brand-green/5 text-brand-green'
+              ? 'border-brand-green/20 bg-brand-green/5 text-brand-green-dark'
               : 'border-border bg-surface-light text-slate-11',
           ].join(' ')}>
             <p className="font-medium">{assigned} / {state.groupSize} passengers assigned</p>

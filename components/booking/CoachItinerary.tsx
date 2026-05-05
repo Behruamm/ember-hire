@@ -6,12 +6,36 @@ type TimelineStep = {
   time: string
   title: string
   detail?: string
-  tone?: 'section' | 'stop' | 'drive' | 'complete'
+  tone: TimelineTone
 }
 
 type WaitingDivider = {
   title: string
   duration: string
+  tone: 'waiting'
+}
+
+type TimelineTone = 'section' | 'boarding' | 'travel' | 'arrival' | 'dropoff' | 'complete' | 'waiting'
+
+const TIMELINE_COPY = {
+  outboundSection: 'Outbound journey',
+  returnSection: 'Return journey',
+  boardAt: (stop: string) => `Board at ${stop}`,
+  travelTo: (stop: string) => `Travel to ${stop}`,
+  arriveAt: (stop: string) => `Arrive at ${stop}`,
+  returnDropoffDetail: (passengers: number) => `${passengers} passenger${passengers === 1 ? '' : 's'} drop off`,
+  outboundComplete: 'Drop-off complete',
+  returnComplete: 'Return complete',
+  waitingAtDestination: 'Waiting at destination',
+} as const
+
+const TIMELINE_DOT_CLASS: Record<Exclude<TimelineTone, 'section'>, string> = {
+  boarding: 'border-border bg-white',
+  travel: 'border-brand-green bg-white',
+  arrival: 'border-border bg-white',
+  dropoff: 'border-border bg-white',
+  complete: 'border-brand-green bg-brand-green',
+  waiting: 'border-border bg-white',
 }
 
 function addMinutes(time: string, minutes: number): string {
@@ -41,10 +65,10 @@ function buildOutboundTimeline({
 }): TimelineStep[] {
   const pickupStops = detail.route.slice(0, -1)
   const pickupBoardingMinutes = pickupStops.length * BOARDING_MINUTES
-  let cursor = subtractMinutes(arrivalTime, detail.driveMinutes + pickupBoardingMinutes)
+  let cursor = subtractMinutes(arrivalTime, detail.driveMinutes + pickupBoardingMinutes + BOARDING_MINUTES)
   const steps: TimelineStep[] = [{
     time: '',
-    title: 'Outbound journey',
+    title: TIMELINE_COPY.outboundSection,
     detail: formatJourneyDuration(detail.totalMinutes),
     tone: 'section',
   }]
@@ -52,17 +76,17 @@ function buildOutboundTimeline({
   pickupStops.forEach((stop, i) => {
     const passengers = passengersAtStop(plan, stop)
     const passengerCopy = showExactPassengers && passengers > 0 ? `${passengers} passengers` : undefined
-    steps.push({ time: cursor, title: `Board at ${stop}`, detail: passengerCopy, tone: 'stop' })
+    steps.push({ time: cursor, title: TIMELINE_COPY.boardAt(stop), detail: passengerCopy, tone: 'boarding' })
     cursor = addMinutes(cursor, BOARDING_MINUTES)
     const segment = detail.segments[i]
-    steps.push({ time: cursor, title: `Travel to ${segment.to}`, tone: 'drive' })
+    steps.push({ time: cursor, title: TIMELINE_COPY.travelTo(segment.to), tone: 'travel' })
     cursor = addMinutes(cursor, segment.driveMinutes)
   })
 
   const destination = detail.route[detail.route.length - 1]
-  steps.push({ time: cursor, title: `Arrive at ${destination}`, tone: 'stop' })
+  steps.push({ time: cursor, title: TIMELINE_COPY.arriveAt(destination), tone: 'arrival' })
   cursor = addMinutes(cursor, BOARDING_MINUTES)
-  steps.push({ time: cursor, title: 'Drop-off complete', tone: 'complete' })
+  steps.push({ time: cursor, title: TIMELINE_COPY.outboundComplete, tone: 'complete' })
 
   return steps
 }
@@ -81,28 +105,29 @@ function buildReturnTimeline({
   let cursor = returnDepartTime
   const destination = returnJourney.route[0]
   const steps: TimelineStep[] = [
-    { time: '', title: 'Return journey', detail: formatJourneyDuration(returnJourney.totalMinutes), tone: 'section' },
-    { time: cursor, title: `Board at ${destination}`, detail: `${plan.passengers} passengers`, tone: 'stop' },
+    { time: '', title: TIMELINE_COPY.returnSection, detail: formatJourneyDuration(returnJourney.totalMinutes), tone: 'section' },
+    { time: cursor, title: TIMELINE_COPY.boardAt(destination), detail: `${plan.passengers} passengers`, tone: 'boarding' },
   ]
 
   cursor = addMinutes(cursor, BOARDING_MINUTES)
 
   returnJourney.segments.forEach((segment, i) => {
-    steps.push({ time: cursor, title: `Travel to ${segment.to}`, tone: 'drive' })
+    steps.push({ time: cursor, title: TIMELINE_COPY.travelTo(segment.to), tone: 'travel' })
     cursor = addMinutes(cursor, segment.driveMinutes)
     const passengers = passengersAtStop(plan, segment.to)
-    const isFinal = i === returnJourney.segments.length - 1
-    const passengerCopy = showExactPassengers && passengers > 0 ? `${passengers} passengers` : undefined
+    const passengerCopy = showExactPassengers && passengers > 0
+      ? TIMELINE_COPY.returnDropoffDetail(passengers)
+      : undefined
     steps.push({
       time: cursor,
-      title: `${isFinal ? 'Final drop-off' : 'Drop off'} at ${segment.to}`,
+      title: TIMELINE_COPY.arriveAt(segment.to),
       detail: passengerCopy,
-      tone: 'stop',
+      tone: 'arrival',
     })
     cursor = addMinutes(cursor, BOARDING_MINUTES)
   })
 
-  steps.push({ time: cursor, title: 'Return complete', tone: 'complete' })
+  steps.push({ time: cursor, title: TIMELINE_COPY.returnComplete, tone: 'complete' })
   return steps
 }
 
@@ -114,7 +139,7 @@ function buildWaitingStep(outboundSteps: TimelineStep[], returnDepartTime: strin
   const DAY_MINUTES = 24 * 60
   const sameDayWait = waitMinutes >= 0 ? waitMinutes : waitMinutes + DAY_MINUTES
   if (sameDayWait <= 0) return null
-  return { title: 'Waiting at destination', duration: formatJourneyDuration(sameDayWait) }
+  return { title: TIMELINE_COPY.waitingAtDestination, duration: formatJourneyDuration(sameDayWait), tone: 'waiting' }
 }
 
 function TimelineRow({ step, isLast }: { step: TimelineStep; isLast: boolean }) {
@@ -127,17 +152,13 @@ function TimelineRow({ step, isLast }: { step: TimelineStep; isLast: boolean }) 
     )
   }
 
-  const dotClass = step.tone === 'complete'
-    ? 'border-brand-green bg-brand-green'
-    : step.tone === 'drive'
-      ? 'border-brand-green bg-white'
-      : 'border-border bg-white'
+  const dotClass = TIMELINE_DOT_CLASS[step.tone]
 
   return (
     <div className="grid grid-cols-[52px_20px_1fr] gap-3 text-sm">
       <time className="pt-px text-right text-sm font-semibold tabular-nums text-ink">{step.time}</time>
       <div className="flex flex-col items-center">
-        <span className={`mt-1 block h-3 w-3 shrink-0 rounded-full border-2 ${dotClass}`} />
+        <span className={`mt-1 block h-3 w-3 shrink-0 rounded-full border-2 ${dotClass}`} data-timeline-tone={step.tone} />
         {!isLast && <span className="mt-1 h-full min-h-7 w-px bg-border" />}
       </div>
       <div className="pb-4">
@@ -153,7 +174,7 @@ function WaitingDividerRow({ wait }: { wait: WaitingDivider }) {
     <div className="grid grid-cols-[52px_20px_1fr] gap-3 text-sm">
       <span />
       <div className="flex flex-col items-center">
-        <span className="mt-2 block h-3 w-3 shrink-0 rounded-full border-2 border-border bg-white" />
+        <span className={`mt-2 block h-3 w-3 shrink-0 rounded-full border-2 ${TIMELINE_DOT_CLASS[wait.tone]}`} data-timeline-tone={wait.tone} />
         <span className="mt-1 h-full min-h-8 w-px bg-border" />
       </div>
       <div className="mb-4 mt-1 text-sm leading-5">

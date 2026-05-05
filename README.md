@@ -2,6 +2,18 @@
 
 Self-serve coach hire quote flow for single-day journeys. This is a portfolio/demo project built to show product thinking, route-based pricing, and production-minded frontend architecture.
 
+[Live demo](https://ember-hire.vercel.app/)
+
+For the product and engineering rationale, see [BUILDING_APPROACH.md](BUILDING_APPROACH.md).
+
+## Why This Project
+
+I built this after reading Ember's role because the self-serve coach hire checkout problem stood out as the kind of ambiguous, product-heavy work I enjoy.
+
+The goal was to explore how a customer could describe a journey, add pickup points, handle passenger counts, receive a route-based estimate, and submit an enquiry without needing a sales call first.
+
+It is not intended to be a complete production system, but it is structured around the areas I would expect to evolve next: persistence, checkout, operational review, rate limiting, and richer route/traffic handling.
+
 ## What It Does
 
 - One-way or same-day return coach hire quotes
@@ -35,6 +47,8 @@ lib/business-rules.ts            Central business constants
 lib/quote-engine.ts              Quote orchestration
 lib/coach-allocation.ts          Multi-coach pickup plans
 lib/pickup-times.ts              Time helpers and pickup timeline logic
+lib/outbound-window.ts           Earliest same-day arrival window logic
+lib/return-window.ts             Same-day return timing window logic
 lib/schemas.ts                   Zod validation schemas
 lib/pricing.ts                   Rates and GBP formatting
 ```
@@ -60,6 +74,8 @@ Business constants live in [lib/business-rules.ts](lib/business-rules.ts):
 - Deposit estimate: 25%
 - Minimum booking notice: 48 hours
 
+The customer-facing arrival time means drop-off complete, so pickup timelines work backwards from the ready-by time and include the final destination stop before that point. Arrival time cannot be earlier than the longest outbound coach plan can complete from a 00:00 same-day start; this is enforced by shared outbound-window logic and guarded again in the quote engine. Return departure must be at or after outbound drop-off complete and early enough for the return route to finish before midnight; this is enforced by shared return-window logic and guarded again in the quote engine.
+
 ## Production-Readiness Status
 
 Completed:
@@ -71,26 +87,13 @@ Completed:
 - Production build passes
 - Architecture docs updated
 
-Deferred:
-
-- **Playwright E2E tests** — the `playwright.config.ts` is already wired up pointing at `__tests__/e2e/`. When written, tests should cover:
-  - Complete one-way booking: journey step → pickups → dropoff → quote (mock `/api/route-segments`) → contact → confirmation with `EMB-` reference
-  - Complete return booking: same flow through `/book/return`, set departure time via TimePicker, verify return timeline appears in journey details
-  - Step 1 validation: submitting empty form shows 3 `role="alert"` elements (journey type, passengers, date)
-  - Pickups validation: empty submit shows `aria-invalid` on Pickup stop 1; `Add another pickup` shows passenger count fields for over-capacity groups; mismatched totals show assignment error
-  - Return departure time: TimePicker disables hours past `latestDepartTime`; hint shows "Latest same-day departure: HH:MM"
-  - Contact validation: required fields show inline errors before submit
-  - Key selectors to use: `getByLabel(/number of passengers/i)`, `getByLabel(/pickup stop 1/i)`, `getByLabel(/drop-off location/i)`, `getByLabel(/arrival time/i)`, `getByLabel(/return departure time/i)`, `getByTestId('quote-hero')`, `getByTestId('route-details')`, `getByRole('button', { name: /^continue$/i })`, `getByRole('button', { name: /^submit$/i })`
-  - Note: arrival and departure times are selected via TimePicker (click-based dropdowns), not `fill()`
-
 Future production work:
 
 - Real enquiry persistence
 - Rate limiting
 - Structured API error codes/logging
-- Deployment with restricted Google Maps key
-
-See [dev-plan/PRODUCTION_READINESS_CHECKLIST.md](dev-plan/PRODUCTION_READINESS_CHECKLIST.md) for the detailed learning checklist.
+- Playwright E2E coverage for the full one-way and return booking journeys
+- Deployment hardening with restricted Google Maps key settings
 
 ## Run Locally
 
@@ -110,6 +113,18 @@ Required Google APIs:
 - Geocoding API
 - Distance Matrix API
 
+## Testing
+
+Current:
+
+- Unit tests covering pricing, coach allocation, pickup timeline, itinerary copy, schemas, and booking logic
+- TypeScript strict mode
+- Production build verification
+
+Next:
+
+- Playwright E2E coverage for the full one-way and return booking journeys
+
 ## Verification
 
 ```bash
@@ -117,9 +132,3 @@ npx tsc --noEmit
 npm run test -- --run
 npm run build
 ```
-
-Current status:
-
-- TypeScript passes
-- 87 unit tests pass
-- Production build passes

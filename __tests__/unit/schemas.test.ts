@@ -136,18 +136,25 @@ describe('pickup schema', () => {
 })
 
 describe('dropoff and return schemas', () => {
-  it('requires dropoff and arrival time', () => {
+  it('requires dropoff location', () => {
     const result = dropoffSchema.safeParse({ dropoff: '', arrivalTime: '' })
 
     expect(result.success).toBe(false)
     if (!result.success) {
-      const fields = firstErrorByField(result.error)
-      expect(fields.dropoff).toBe('Drop-off location is required')
-      expect(fields.arrivalTime).toBe('Arrival time is required')
+      expect(firstErrorByField(result.error).dropoff).toBe('Drop-off location is required')
     }
   })
 
-  it('requires return departure time and return stops', () => {
+  it('requires arrival time', () => {
+    const result = dropoffSchema.safeParse({ dropoff: '', arrivalTime: '' })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(firstErrorByField(result.error).arrivalTime).toBe('Arrival time is required')
+    }
+  })
+
+  it('requires return departure time', () => {
     const result = returnDetailsSchema.safeParse({
       returnDepartTime: '',
       returnPickups: [],
@@ -155,15 +162,35 @@ describe('dropoff and return schemas', () => {
 
     expect(result.success).toBe(false)
     if (!result.success) {
-      const fields = firstErrorByField(result.error)
-      expect(fields.returnDepartTime).toBe('Return departure time is required')
-      expect(fields.returnPickups).toBeDefined()
+      expect(firstErrorByField(result.error).returnDepartTime).toBe('Return departure time is required')
+    }
+  })
+
+  it('requires at least one return stop', () => {
+    const result = returnDetailsSchema.safeParse({
+      returnDepartTime: '',
+      returnPickups: [],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(firstErrorByField(result.error).returnPickups).toBeDefined()
     }
   })
 })
 
 describe('contact schema', () => {
-  it('trims and accepts valid contact details', () => {
+  it('accepts valid contact details', () => {
+    const result = contactSchema.safeParse({
+      name: 'Behram',
+      email: 'behram@example.com',
+      phone: '07700 900000',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('trims whitespace from name, email, and phone', () => {
     expect(contactSchema.parse({
       name: ' Behram ',
       email: ' behram@example.com ',
@@ -211,16 +238,25 @@ describe('contact schema', () => {
 })
 
 describe('return details schema', () => {
-  it('rejects a return departure time that is before the arrival time', () => {
+  it('accepts an earlier return departure time because it only validates field shape', () => {
     const result = returnDetailsSchema.safeParse({
       returnDepartTime: '12:00',
       returnPickups: ['EH1 1YZ'],
       arrivalTime: '14:00',
     })
 
-    // The schema accepts the time format but the UI enforces the min constraint.
-    // This test documents that returnDetailsSchema does NOT enforce depart > arrival —
-    // that constraint lives in the TimePicker min prop on the return page.
     expect(result.success).toBe(true)
+  })
+
+  it('rejects malformed return departure times', () => {
+    const result = returnDetailsSchema.safeParse({
+      returnDepartTime: '24:00',
+      returnPickups: ['EH1 1YZ'],
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(firstErrorByField(result.error).returnDepartTime).toBe('Please enter a valid time')
+    }
   })
 })

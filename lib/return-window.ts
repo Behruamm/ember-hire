@@ -31,6 +31,21 @@ export function canCompleteReturnSameDay(departTime: string, latestDepartTime: s
   return parseTime(departTime) <= parseTime(latestDepartTime)
 }
 
+export function isReturnDepartTimeWithinWindow(
+  departTime: string,
+  earliestDepartTime?: string | null,
+  latestDepartTime?: string | null,
+): boolean {
+  const departure = parseTime(departTime)
+  if (earliestDepartTime && departure < parseTime(earliestDepartTime)) return false
+  if (latestDepartTime && departure > parseTime(latestDepartTime)) return false
+  return true
+}
+
+export function canCompleteReturnByMidnight(departTime: string, totalMinutes: number): boolean {
+  return parseTime(departTime) + totalMinutes <= DAY_MINUTES
+}
+
 function formatSameDayTime(minutes: number): string {
   const clamped = Math.max(0, Math.min(minutes, DAY_MINUTES - 1))
   const hours = Math.floor(clamped / 60)

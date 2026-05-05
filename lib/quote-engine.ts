@@ -2,6 +2,8 @@ import type { BookingState, QuoteBreakdown } from '@/types/booking'
 import { allocateCoaches, buildSingleCoachPlans, returnRouteForCoach, routeForCoach, COACH_CAPACITY, type CoachPlan } from '@/lib/coach-allocation'
 import { BOARDING_MINUTES, parseTime, type Segment } from '@/lib/pickup-times'
 import { RATES } from '@/lib/pricing'
+import { canCompleteReturnByMidnight, isReturnDepartTimeWithinWindow } from '@/lib/return-window'
+import { calculateOutboundWindow, isArrivalTimeWithinOutboundWindow } from '@/lib/outbound-window'
 
 export interface RouteProvider {
   getSegments(stops: string[]): Promise<Segment[]>
@@ -78,12 +80,25 @@ export async function calculateQuote(
 
   outbound.sort((a, b) => a.coachNumber - b.coachNumber)
 
+  const outboundWindow = outbound.reduce((latest, current) => {
+    const currentWindow = calculateOutboundWindow(current.segments, current.route.length - 1)
+    return currentWindow.totalMinutes > latest.totalMinutes ? currentWindow : latest
+  }, calculateOutboundWindow([], 0))
+
+  if (!isArrivalTimeWithinOutboundWindow(state.arrivalTime, outboundWindow.earliestArrivalTime)) {
+    throw new Error('Arrival time is too early for this route to start and finish on the same day.')
+  }
+
   let returnJourneys: ReturnJourneyDetail[] = []
   let waitMinutes = 0
 
   if (state.journeyType === 'return') {
     if (!state.returnDepartTime || !state.returnPickups.length) {
       throw new Error('Return departure time and return stops are required for return journeys.')
+    }
+    const returnDepartTime = state.returnDepartTime
+    if (!isReturnDepartTimeWithinWindow(returnDepartTime, state.arrivalTime)) {
+      throw new Error('Return departure time must be after arrival time for same-day return journeys.')
     }
 
     returnJourneys = await Promise.all(coachPlans.map(async (plan) => {
@@ -102,8 +117,11 @@ export async function calculateQuote(
       }
     }))
     returnJourneys.sort((a, b) => a.coachNumber - b.coachNumber)
+    if (returnJourneys.some((journey) => !canCompleteReturnByMidnight(returnDepartTime, journey.totalMinutes))) {
+      throw new Error('Return journey must be completed before midnight.')
+    }
 
-    waitMinutes = minutesUntil(state.arrivalTime, state.returnDepartTime)
+    waitMinutes = minutesUntil(state.arrivalTime, returnDepartTime)
   }
 
   const outboundMinutes = outbound.reduce((sum, detail) => sum + detail.totalMinutes, 0)

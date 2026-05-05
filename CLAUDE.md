@@ -99,6 +99,8 @@ lib/coach-allocation.ts  # allocateCoaches() — splits large groups across coac
 lib/pickup-times.ts      # calcPickupTimeline(segments, pickups, arrivalTime) → departure times
                          # parseTime(hhmm) → minutes, formatTime(minutes) → HH:MM
                          # BOARDING_MINUTES = 15 per stop
+lib/outbound-window.ts   # calculateOutboundWindow() → earliest same-day arrival time
+                         # isArrivalTimeWithinOutboundWindow(arrivalTime, earliestArrivalTime) → boolean
 lib/return-window.ts     # calculateReturnWindow() → latest same-day departure time
                          # canCompleteReturnSameDay(departTime, latestDepartTime) → boolean
 lib/pricing.ts           # buildQuote(coaches, driveMin, waitMin) → QuoteBreakdown
@@ -116,7 +118,7 @@ lib/reference.ts         # generateReference() — 8-char alphanumeric
 1. User fills wizard steps → state stored in `BookingContext` (single `useReducer`, persisted to `localStorage` key `ember-booking-v2`)
 2. Route guards on each page check `hydrated` flag before redirecting — prevents false redirects on page refresh
 3. On quote page: client POSTs stops to `/api/route-segments` → server geocodes via Google Geocoding API → gets drive times via Distance Matrix API → returns segments
-4. `calcPickupTimeline()` back-calculates departure times from arrival time using real segment data
+4. `calcPickupTimeline()` back-calculates departure times from the drop-off-complete arrival time using real segment data
 5. Quote calculation uses exact route/stop minutes and wait minutes, then contact submits the enquiry
 
 ### Route Segment API
@@ -138,10 +140,11 @@ Geocoding and Distance Matrix calls run in parallel per batch. Returns a 422 if 
 
 ### Pickup Timeline Back-Calculation
 
-Walk backwards from arrival time. For each pickup (last → first):
+Walk backwards from the requested arrival time, which means passengers are dropped off and ready to enter. First subtract the destination drop-off stop, then process each pickup (last → first):
 ```
+cursor -= BOARDING_MINUTES        // destination drop-off before ready-by time
 cursor -= segment.driveMinutes   // drive from this stop to the next
-cursor -= 15                     // boarding time at this stop
+cursor -= BOARDING_MINUTES        // boarding time at this stop
 departTime = formatTime(cursor)
 ```
 
@@ -159,7 +162,8 @@ coachCount  = ceil(groupSize / 53)
 ```
 
 `totalDriveMinutes` is the sum of all per-coach route times (drive + 15min stop per pickup and drop-off). For multi-coach groups each coach is routed separately so their minutes are added together.
-`totalWaitMinutes` = gap between outbound arrival and return departure (return journeys only). Multiplied per coach.
+Arrival time must be no earlier than the longest outbound coach plan can complete from a 00:00 same-day start; `lib/outbound-window.ts` plus `lib/quote-engine.ts` enforce this rule.
+`totalWaitMinutes` = gap between outbound drop-off complete and return departure (return journeys only). Multiplied per coach. Return departure must be at or after outbound completion and each return route must finish by midnight; the UI uses `TimePicker` bounds, and `lib/return-window.ts` plus `lib/quote-engine.ts` enforce the same business rule.
 
 ---
 
@@ -189,7 +193,7 @@ Required Google Maps APIs (both must be enabled on the key):
 ### Verification
 Never mark a task complete without:
 - `npx tsc --noEmit` passes
-- `npm run test -- --run` passes (all 87 tests green)
+- `npm run test -- --run` passes (all 140 tests green)
 - The relevant UI step works in the browser
 
 ### SSR Guards

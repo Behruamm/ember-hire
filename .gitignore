@@ -42,10 +42,11 @@ next-env.d.ts
 
 # tooling / local dev
 .claude/
+.agents/
+.codex/
 .omc/
 .hintrc
 tasks/
-dev-plan/
 test-results/
 playwright-report/
 vendor/
@@ -53,8 +54,7 @@ vendor/
 # project docs not for repo
 CLAUDE.md.bak
 DEPLOY.md
-Project.md
 skills.md
 me.md
-HANDOFF.md
 public/logo.html
+.gitnexus

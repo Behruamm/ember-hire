@@ -70,7 +70,7 @@ export default function DatePicker({ value, onChange, minDate, maxDate, classNam
           type="button"
           onClick={prevMonth}
           aria-label="Previous month"
-          className="w-8 h-8 flex items-center justify-center rounded-sm text-slate-11 hover:bg-surface-light hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
+          className="min-h-11 min-w-11 flex items-center justify-center rounded-sm text-slate-11 hover:bg-surface-light hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -85,7 +85,7 @@ export default function DatePicker({ value, onChange, minDate, maxDate, classNam
           type="button"
           onClick={nextMonth}
           aria-label="Next month"
-          className="w-8 h-8 flex items-center justify-center rounded-sm text-slate-11 hover:bg-surface-light hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
+          className="min-h-11 min-w-11 flex items-center justify-center rounded-sm text-slate-11 hover:bg-surface-light hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

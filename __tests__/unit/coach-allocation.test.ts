@@ -68,19 +68,27 @@ describe('allocateCoaches', () => {
     ])
   })
 
-  it('ignores zero-passenger pickups for coach assignment', () => {
+  it('ignores zero-passenger pickups — produces one coach plan', () => {
     const plans = allocateCoaches([
       { address: 'A', passengers: 0 },
       { address: 'B', passengers: 12 },
     ])
 
     expect(plans).toHaveLength(1)
+  })
+
+  it('ignores zero-passenger pickups — excludes the zero stop from the plan', () => {
+    const plans = allocateCoaches([
+      { address: 'A', passengers: 0 },
+      { address: 'B', passengers: 12 },
+    ])
+
     expect(plans[0].pickups).toEqual([{ address: 'B', passengers: 12 }])
   })
 })
 
-describe('route helpers', () => {
-  it('builds one outbound route per coach', () => {
+describe('routeForCoach', () => {
+  it('builds outbound route: pickups in order then destination', () => {
     const [plan] = allocateCoaches([
       { address: 'A', passengers: 40 },
       { address: 'B', passengers: 13 },
@@ -88,8 +96,10 @@ describe('route helpers', () => {
 
     expect(routeForCoach(plan, 'Destination')).toEqual(['A', 'B', 'Destination'])
   })
+})
 
-  it('builds return route in reverse pickup order', () => {
+describe('returnRouteForCoach', () => {
+  it('builds return route: destination first then pickups in reverse order', () => {
     const [plan] = allocateCoaches([
       { address: 'A', passengers: 40 },
       { address: 'B', passengers: 13 },

@@ -26,7 +26,7 @@ export default function EmberHeader({ transparent = false, progressLine }: Ember
     <header
       data-transparent={String(transparent)}
       className={[
-        'relative z-50 h-[var(--nav-height)]',
+        'relative z-50',
         transparent ? '' : 'sticky top-0',
       ].join(' ')}
     >
@@ -34,7 +34,7 @@ export default function EmberHeader({ transparent = false, progressLine }: Ember
         <div className="flex items-center justify-between">
 
           {/* Logo */}
-          <Link href="/" aria-label="Ember home" className="nav-logo">
+          <Link href="/" aria-label="Ember home" className="nav-logo min-h-11 inline-flex items-center">
             <EmberLogo
               width={100}
               textColor={menuOpen ? 'var(--color-ink)' : transparent ? '#ffffff' : 'var(--color-ink)'}
@@ -56,7 +56,7 @@ export default function EmberHeader({ transparent = false, progressLine }: Ember
           {/* Mobile hamburger */}
           <button
             type="button"
-            className={`md:hidden p-2 rounded-[var(--radius-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green ${menuOpen ? 'text-[var(--color-ink)]' : 'nav-hamburger'}`}
+            className={`md:hidden min-h-11 min-w-11 p-2 rounded-[var(--radius-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green ${menuOpen ? 'text-[var(--color-ink)]' : 'nav-hamburger'}`}
             onClick={() => setMenuOpen((o) => !o)}
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen ? 'true' : 'false'}
@@ -78,12 +78,12 @@ export default function EmberHeader({ transparent = false, progressLine }: Ember
         >
           {/* Top bar mirrors the header */}
           <div className="flex items-center justify-between h-[var(--nav-height)] px-[var(--spacing-container-x)] shrink-0">
-            <Link href="/" aria-label="Ember home" onClick={() => setMenuOpen(false)}>
+            <Link href="/" aria-label="Ember home" className="min-h-11 inline-flex items-center" onClick={() => setMenuOpen(false)}>
               <EmberLogo width={100} textColor="var(--color-ink)" />
             </Link>
             <button
               type="button"
-              className="p-2 rounded-[var(--radius-sm)] text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
+              className="min-h-11 min-w-11 p-2 rounded-[var(--radius-sm)] text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
               onClick={() => setMenuOpen(false)}
               aria-label="Close menu"
             >

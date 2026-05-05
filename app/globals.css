@@ -5,8 +5,8 @@
   --font-sans: var(--font-montserrat), "Montserrat", "Times", serif;
 
   /* ── Brand colours ── */
-  --color-brand-green:       #4f917a;
-  --color-brand-green-dark:  #238078;
+  --color-brand-green:       #238078;
+  --color-brand-green-dark:  #1b665f;
   --color-brand-green-light: #8ab5a6;
   --color-brand-green-muted: #c6dad3;
 
@@ -167,7 +167,8 @@ header[data-transparent='false'] .nav-login:hover {
 }
 
 .nav-logo {
-  display: block;
+  display: inline-flex;
+  align-items: center;
 }
 
 .nav-hamburger {
@@ -179,7 +180,7 @@ header[data-transparent='true'] .nav-hamburger {
 
 .nav-inner {
   width: 100%;
-  height: 100%;
+  height: var(--nav-height);
   display: flex;
   flex-direction: column;
   justify-content: center;
