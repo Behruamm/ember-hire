@@ -1,12 +1,37 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working in this repository.
 
 ---
 
 ## Project
 
-**Ember Coach Hire** — a self-serve coach hire booking flow. Portfolio project. No backend, no online checkout, no auth. Client-side wizard with one server-side API route for Google Maps.
+**Ember Coach Hire** is a self-serve coach hire booking-flow portfolio project.
+
+Key constraints:
+
+- No full backend
+- No authentication
+- No online checkout
+- Client-side booking wizard
+- One server-side API route for Google Maps route calculations
+- Single travel date only
+
+---
+
+## Non-Negotiables
+
+- Run verification before marking work complete:
+  - `npx tsc --noEmit`
+  - `npm run test -- --run`
+  - Relevant UI step works in the browser
+- Never expose the Google Maps API key to client code.
+- Google Maps calls must only go through `app/api/route-segments/route.ts`.
+- Do not access `window` or `localStorage` during SSR.
+- Use the existing `BookingContext` state flow instead of creating parallel state.
+- Business rules for pricing, capacity, booking windows, and timing must stay centralized in `lib/`.
+- Wizard pages and hook-based components need `"use client"`.
+- API routes must not import client-only modules.
 
 ---
 
@@ -16,8 +41,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd ember-hire
 
 npm run dev          # Start dev server on localhost:3000
-npm run build        # Production build (run before every deploy)
-npm run test         # Vitest unit tests — all must pass before any UI work
+npm run build        # Production build; run before deploy
+npm run test         # Vitest unit tests
 npm run lint         # ESLint via next lint
 npx tsc --noEmit     # Type-check without emitting
 
@@ -27,192 +52,330 @@ npx vitest run __tests__/unit/pickup-times.test.ts
 
 ---
 
-## Architecture
+## Tech Stack
 
-### Tech Stack
-- **Next.js 16 App Router** — file-based routing, `app/` directory
-- **TypeScript strict mode** — all types in `types/booking.ts`
-- **Tailwind CSS** — white background, `#3D8B6E` green accent, Inter font
-- **State:** React Context + `useReducer` + `localStorage` via `context/BookingContext.tsx`
-- **Maps:** Google Maps APIs (Geocoding + Distance Matrix) — server-side only via `app/api/route-segments/route.ts`
-- **Tests:** Vitest (unit)
+- **Next.js 16 App Router**
+- **TypeScript strict mode**
+- **Tailwind CSS**
+- **React Context + useReducer**
+- **localStorage persistence**
+- **Google Geocoding API**
+- **Google Distance Matrix API**
+- **Vitest**
 
-### User Flow
+Main shared types live in:
 
-```
-Step 1  /book            Journey type + passengers + date, single travel date only
-Step 2  /book/pickups    Pickup postcodes/addresses (one or many, in order)
-Step 3  /book/dropoff    Drop-off location + arrival time
-          IF one way → /book/quote
-          IF return  → /book/return
-Step 3b /book/return     Return pickup point + read-only drop-off stops with passenger counts + departure time
-Step 4  /book/quote      Quote — real drive times via Google Maps, pickup timeline, price breakdown, estimated deposit
-Step 5  /book/contact    Name, email, phone
-Step 6  /book/confirmation  EMB-XXXXXXXX reference, "we'll call within 24hrs"
+```text
+types/booking.ts
 ```
 
-### State Shape (flat, single day only)
+---
 
-```typescript
-// types/booking.ts
+## Booking Flow
+
+```text
+/book
+  Journey type, passengers, date
+
+/book/pickups
+  Pickup postcodes or addresses, one or many, in order
+
+/book/dropoff
+  Drop-off location and arrival time
+
+/book/return
+  Return pickup point, read-only return stops, passenger counts, departure time
+
+/book/quote
+  Real drive times, pickup timeline, price breakdown, estimated deposit
+
+/book/contact
+  Name, email, phone
+
+/book/confirmation
+  EMB-XXXXXXXX reference and confirmation message
+```
+
+One-way bookings skip `/book/return` and go straight from `/book/dropoff` to `/book/quote`.
+
+---
+
+## State Shape
+
+Booking state is flat and single-day only.
+
+```ts
 {
   journeyType: 'oneway' | 'return' | null
   groupSize: number | null
-  date: string | null           // ISO YYYY-MM-DD
-  pickups: string[]             // postcodes/addresses in order
+  date: string | null
+  pickups: string[]
   dropoff: string | null
-  arrivalTime: string | null    // HH:MM
+  arrivalTime: string | null
   returnDepartTime: string | null
-  returnPickups: string[]       // pre-filled from outbound pickups
-  pickupPassengerCounts: number[]  // per-pickup counts for over-capacity multi-pickup groups
-  contact: { name: string; email: string; phone: string; notes?: string } | null
+  returnPickups: string[]
+  pickupPassengerCounts: number[]
+  contact: {
+    name: string
+    email: string
+    phone: string
+    notes?: string
+  } | null
   quote: QuoteBreakdown | null
   referenceNumber: string | null
 }
 ```
 
-### Page Structure
+State source of truth:
 
-```
-app/page.tsx                        # Landing page (Ember brand replica)
-app/book/layout.tsx                 # BookingProvider wrapper + EmberHeader
-app/book/page.tsx                   # Step 1: Journey type + passengers + date
-app/book/journey/page.tsx           # Legacy redirect to /book
-app/book/group/page.tsx             # Legacy redirect to /book
-app/book/date/page.tsx              # Legacy redirect to /book
-app/book/pickups/page.tsx           # Step 2: Pickup locations
-app/book/dropoff/page.tsx           # Step 3: Drop-off + arrival time
-app/book/return/page.tsx            # Step 3b: Return stops + departure time
-app/book/quote/page.tsx             # Step 4: Quote with real drive times + timeline
-app/book/contact/page.tsx           # Step 5: Contact details
-app/book/confirmation/page.tsx      # Step 6: Reference number
-app/api/route-segments/route.ts     # POST — geocode + Distance Matrix, server-side only
+```text
+context/BookingContext.tsx
 ```
 
-### Logic Layer
+Rules:
 
+- `BookingProvider` wraps `app/book/layout.tsx`.
+- All wizard pages share the same reducer.
+- State persists to localStorage using key `ember-booking-v2`.
+- Ignore the old `ember-booking` key.
+- Use the exposed `hydrated` flag before redirecting.
+- `clearBooking()` resets state and removes localStorage data on confirmation.
+
+---
+
+## Core Business Rules
+
+Central business rules live in `lib/`.
+
+Important constants:
+
+- Coach capacity: **53 seats**
+- Boarding time: **15 minutes per stop**
+- Base rate: **£300 × coach count**
+- Driving rate: **£60/hour**
+- Waiting rate: **£20/hour × coach count**
+
+Pricing formula:
+
+```text
+coachCount  = ceil(groupSize / 53)
+baseRate    = £300 × coachCount
+drivingCost = (totalDriveMinutes / 60) × £60
+waitingCost = (totalWaitMinutes / 60) × £20 × coachCount
+total       = baseRate + drivingCost + waitingCost
 ```
-lib/business-rules.ts    # central rates, capacity, deposit, booking window — single source of truth
-lib/quote-engine.ts      # calculateQuote(state, routeProvider) → quote + journey details
-lib/coach-allocation.ts  # allocateCoaches() — splits large groups across coaches by pickup
-                         # routeForCoach() / returnRouteForCoach() — per-coach route arrays
-lib/pickup-times.ts      # calcPickupTimeline(segments, pickups, arrivalTime) → departure times
-                         # parseTime(hhmm) → minutes, formatTime(minutes) → HH:MM
-                         # BOARDING_MINUTES = 15 per stop
-lib/outbound-window.ts   # calculateOutboundWindow() → earliest same-day arrival time
-                         # isArrivalTimeWithinOutboundWindow(arrivalTime, earliestArrivalTime) → boolean
-lib/return-window.ts     # calculateReturnWindow() → latest same-day departure time
-                         # canCompleteReturnSameDay(departTime, latestDepartTime) → boolean
-lib/pricing.ts           # buildQuote(coaches, driveMin, waitMin) → QuoteBreakdown
-                         # formatGBP(amount) → '£1,234'
-                         # RATES: base £300, drive £60/hr, wait £20/hr
-lib/coaches.ts           # coachCount(groupSize) — 53 capacity
-                         # capacityWarning(groupSize) — multi-coach banner text
-lib/schemas.ts           # Zod schemas for wizard validation
-lib/format.ts            # addDays(), toISO(), formatDisplay(), formatShortDate()
-lib/reference.ts         # generateReference() — 8-char alphanumeric
+
+For multi-coach groups:
+
+- Each coach is routed separately.
+- Per-coach route times are added together.
+- Passenger counts per pickup determine coach allocation.
+
+---
+
+## Route Segment API
+
+Route calculations must go through:
+
+```text
+POST /api/route-segments
 ```
 
-### Key Data Flow
+Request:
 
-1. User fills wizard steps → state stored in `BookingContext` (single `useReducer`, persisted to `localStorage` key `ember-booking-v2`)
-2. Route guards on each page check `hydrated` flag before redirecting — prevents false redirects on page refresh
-3. On quote page: client POSTs stops to `/api/route-segments` → server geocodes via Google Geocoding API → gets drive times via Distance Matrix API → returns segments
-4. `calcPickupTimeline()` back-calculates departure times from the drop-off-complete arrival time using real segment data
-5. Quote calculation uses exact route/stop minutes and wait minutes, then contact submits the enquiry
-
-### Route Segment API
-
-`POST /api/route-segments`
 ```json
-// Request
-{ "stops": ["EH1 1YZ", "EH10 4BF", "Murrayfield Stadium"] }
+{
+  "stops": ["EH1 1YZ", "EH10 4BF", "Murrayfield Stadium"]
+}
+```
 
-// Response
-{ "segments": [
-    { "from": "EH1 1YZ", "to": "EH10 4BF", "driveMinutes": 9, "distanceMetres": 3200 },
-    { "from": "EH10 4BF", "to": "Murrayfield Stadium", "driveMinutes": 12, "distanceMetres": 4100 }
+Response:
+
+```json
+{
+  "segments": [
+    {
+      "from": "EH1 1YZ",
+      "to": "EH10 4BF",
+      "driveMinutes": 9,
+      "distanceMetres": 3200
+    },
+    {
+      "from": "EH10 4BF",
+      "to": "Murrayfield Stadium",
+      "driveMinutes": 12,
+      "distanceMetres": 4100
+    }
   ]
 }
 ```
 
-Geocoding and Distance Matrix calls run in parallel per batch. Returns a 422 if any stop cannot be geocoded — no silent fallback.
+Rules:
 
-### Pickup Timeline Back-Calculation
+- Geocoding and Distance Matrix calls are server-side only.
+- Return `422` if any stop cannot be geocoded.
+- Do not silently fall back to fake route data.
+- Required Google APIs:
+  - Geocoding API
+  - Distance Matrix API
 
-Walk backwards from the requested arrival time, which means passengers are dropped off and ready to enter. First subtract the destination drop-off stop, then process each pickup (last → first):
+---
+
+## Pickup Timeline Logic
+
+Pickup times are back-calculated from the requested arrival time.
+
+The arrival time means passengers are dropped off and ready to enter.
+
+Algorithm:
+
+```text
+cursor = arrivalTime
+
+cursor -= BOARDING_MINUTES        # destination drop-off before ready-by time
+
+for each pickup from last to first:
+  cursor -= segment.driveMinutes
+  cursor -= BOARDING_MINUTES
+  departTime = formatTime(cursor)
 ```
-cursor -= BOARDING_MINUTES        // destination drop-off before ready-by time
-cursor -= segment.driveMinutes   // drive from this stop to the next
-cursor -= BOARDING_MINUTES        // boarding time at this stop
-departTime = formatTime(cursor)
+
+Return pickup results in forward order, first pickup first.
+
+Relevant module:
+
+```text
+lib/pickup-times.ts
 ```
 
-Results returned in forward order (first pickup first).
+---
 
-### Pricing Formula
+## Booking Windows
 
-```
-baseRate    = £300 × coachCount
-drivingCost = (totalDriveMinutes / 60) × £60        // shared across all coaches
-waitingCost = (totalWaitMinutes / 60) × £20 × coachCount
-total       = baseRate + drivingCost + waitingCost
+Outbound:
 
-coachCount  = ceil(groupSize / 53)
-```
+- Arrival time must be no earlier than the longest outbound coach plan can complete from a same-day `00:00` start.
+- Enforced by `lib/outbound-window.ts` and `lib/quote-engine.ts`.
 
-`totalDriveMinutes` is the sum of all per-coach route times (drive + 15min stop per pickup and drop-off). For multi-coach groups each coach is routed separately so their minutes are added together.
-Arrival time must be no earlier than the longest outbound coach plan can complete from a 00:00 same-day start; `lib/outbound-window.ts` plus `lib/quote-engine.ts` enforce this rule.
-`totalWaitMinutes` = gap between outbound drop-off complete and return departure (return journeys only). Multiplied per coach. Return departure must be at or after outbound completion and each return route must finish by midnight; the UI uses `TimePicker` bounds, and `lib/return-window.ts` plus `lib/quote-engine.ts` enforce the same business rule.
+Return:
+
+- Return departure must be at or after outbound completion.
+- Return route must finish by midnight.
+- UI bounds and quote-engine rules must match.
+- Enforced by `lib/return-window.ts` and `lib/quote-engine.ts`.
 
 ---
 
 ## Environment Variables
 
-| Variable | Where set | Purpose |
+| Variable | Where | Purpose |
 |---|---|---|
-| `GOOGLE_MAPS_API_KEY` | `.env.local` (local), Vercel dashboard (prod) | Geocoding API + Distance Matrix API — server-side only |
+| `GOOGLE_MAPS_API_KEY` | `.env.local`, Vercel dashboard | Server-side Geocoding API and Distance Matrix API |
 | `GEMINI_API_KEY` | `.env.local` | Reserved for future AI assistant feature |
 
-Required Google Maps APIs (both must be enabled on the key):
-- Geocoding API
-- Distance Matrix API
+Never expose either key in client components.
 
 ---
 
-## State Management
+## Styling and Brand
 
-`context/BookingContext.tsx` is the single source of truth:
-- `BookingProvider` wraps `app/book/layout.tsx` — all wizard pages share one reducer
-- `hydrated` boolean is exposed so route guards wait for localStorage rehydration before firing
-- Storage key: `ember-booking-v2` (v1 key `ember-booking` is ignored)
-- `clearBooking()` resets state + removes from localStorage (called on confirmation page)
+Use the existing design tokens in:
 
-## Workflow Rules
+```text
+app/globals.css
+```
 
-### Verification
-Never mark a task complete without:
-- `npx tsc --noEmit` passes
-- `npm run test -- --run` passes (all 140 tests green)
-- The relevant UI step works in the browser
+Brand values:
 
-### SSR Guards
-Any code accessing `window` or `localStorage` must be inside `useEffect` or guarded with `typeof window !== 'undefined'`. The `BookingProvider` handles this — don't access localStorage directly in components.
+- Background: `#ffffff`
+- Primary accent: `#4f917a`
+- Hover accent: `#238078`
+- Primary text: `#252a31`
+- Secondary text: `#60646c`
+- Muted text: `#8b8d98`
+- Font: **Montserrat**, loaded with `next/font/google`
 
-### `"use client"` Directive
-All wizard pages and components using hooks need `"use client"`. The `app/api/` routes must never import client-only modules. All `lib/` modules are server-safe.
+Prefer CSS variables such as:
 
-### Never Expose the Maps Key
-All Google Maps API calls go through `app/api/route-segments/route.ts` only. Never call Google APIs from client components.
+```css
+var(--color-brand-green)
+var(--radius-sm)
+var(--shadow-card)
+```
 
 ---
 
-## Brand
+## SSR and Client Rules
 
-- Background: white (`#ffffff`)
-- Primary accent: `#4f917a` (Ember Green — buttons, icons, active states); hover `#238078`
-- Text: `#252a31` (ink/primary), `#60646c` (secondary), `#8b8d98` (muted/placeholder)
-- Font: **Montserrat** (Google Fonts, loaded via `next/font/google`)
-- Design tokens: defined in `app/globals.css` under `@theme` — use CSS vars like `var(--color-brand-green)`, `var(--radius-sm)`, `var(--shadow-card)` etc.
-- Coach capacity: 53 seats
-- Boarding time: 15 min per stop
+- Any code using `window` or `localStorage` must run inside `useEffect` or be guarded with `typeof window !== 'undefined'`.
+- Do not read localStorage directly in wizard components unless there is a strong reason.
+- Prefer `BookingContext`.
+- Route guards must wait for `hydrated`.
+- Components using hooks need `"use client"`.
+- `app/api/` routes must never import client-only modules.
+- Shared `lib/` modules should stay server-safe.
+
+---
+
+## Testing Expectations
+
+Before completion:
+
+```bash
+npx tsc --noEmit
+npm run test -- --run
+```
+
+Expected test state:
+
+```text
+All tests pass.
+Currently: 140 tests green.
+```
+
+For UI work, also verify the affected wizard step in the browser.
+
+Do not claim work is complete if type-checking, tests, or relevant browser behavior have not been verified.
+
+---
+
+## When Editing Pricing or Timing
+
+Check all affected areas:
+
+- Quote total
+- Coach count
+- Multi-coach routing
+- Pickup timeline
+- Return wait time
+- Outbound earliest arrival
+- Return latest departure
+- UI time picker bounds
+- Unit tests
+
+Update or add tests for any changed rule.
+
+---
+
+## When Editing the Wizard
+
+Preserve these behaviors:
+
+- Step order
+- Route guards wait for hydration
+- State persists across refresh
+- Return journeys include return step
+- One-way journeys skip return step
+- Confirmation clears booking state
+- Reference number format stays `EMB-XXXXXXXX`
+
+---
+
+## Repository Etiquette
+
+- Keep business logic in `lib/`, not scattered through page components.
+- Keep API secrets server-side.
+- Prefer small, focused changes.
+- Do not introduce duplicate sources of truth.
+- Do not bypass existing validation schemas.
+- Do not replace real route calculations with mock data unless explicitly working in a test.
